@@ -9,17 +9,17 @@ import javax.script.ScriptException;
 import java.io.*;
 import java.nio.charset.StandardCharsets;
 
-class PluginLoader {
+public class PluginLoader {
 
     private final ScriptEngineFactory scriptEngineFactory;
     private final Printer printer;
 
-    PluginLoader(ScriptEngineFactory scriptEngineFactory, Printer printer) {
+    public PluginLoader(ScriptEngineFactory scriptEngineFactory, Printer printer) {
         this.scriptEngineFactory = scriptEngineFactory;
         this.printer = printer;
     }
 
-    Plugin load(File sourceFile, Language kotlinVersion) {
+    public Plugin load(File sourceFile, Language kotlinVersion) {
         Reader sourceFileReader = readerFrom(sourceFile);
         ScriptEngine scriptEngine = scriptEngineFactory.get(kotlinVersion);
         Plugin plugin = runScript(sourceFileReader, scriptEngine);
@@ -49,9 +49,7 @@ class PluginLoader {
     }
 
     private Plugin tryInstantiating(String filename, ScriptEngine scriptEngine) {
-        String className = filename
-                .replace(".kts", "")
-                .replace(".kt", "");
+        String className = filename.replace(".kts", "").replace(".kt", "");
         try {
             Object result = scriptEngine.eval(className + "()");
             return (Plugin) result;

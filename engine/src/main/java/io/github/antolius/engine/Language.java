@@ -1,5 +1,7 @@
 package io.github.antolius.engine;
 
+import java.net.URL;
+
 public enum Language {
 
     KOTLIN_1_1(
@@ -27,7 +29,7 @@ public enum Language {
         return supplierClass;
     }
 
-    public String getJarFile() {
-        return this.getClass().getResource(resourceName).getFile();
+    public URL getJarURL() {
+        return this.getClass().getResource(resourceName);
     }
 }

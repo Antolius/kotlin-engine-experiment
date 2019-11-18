@@ -77,9 +77,9 @@ Of note is that the _Engine_ module doesn't directly depend on Kotlin 1/2/3 modu
 
 ## Getting started
 
-This experiment application falls short of the FaaS platform described in the _Use-case_ section. It is only capable of loading and running Kotlin scripts. Id doesn't deal wit managing scripts themselves nor with exposing them as HTTP endpoints. Also, the `Plugin` API interface is rudimentary.
+This experiment application falls short of the FaaS platform described in the _Use-case_ section. It is only capable of loading and running Kotlin scripts. It doesn't deal with managing scripts themselves, securely compartmentalizing the running scripts nor with exposing them as HTTP endpoints. Also, the `Plugin` API interface is rudimentary.
 
-However, if you wish you can build the project locally, play around with it, and even build some more sophisticated, fully featured solution on top of it. Here are instructions on doing so.
+However, you can build the project locally and play around with it. You can even build some more sophisticated, fully featured solution on top of it. Here are instructions on how to get started.
 
 ### Prerequisites
 
@@ -98,9 +98,78 @@ $ mvn clean install
 
 in the project's root directory.
 
+### Usage
+
+Class that you can use to load `Plugin`-s from Kotlin scripts is `io.github.antolius.engine.PluginLoader`. In order to instantiate it you will need to provide it with `ScriptEngineFactory` and an implementation of a `io.github.antolius.api.Printer` interface. `Printer` is used here just as an illustration how [dependency injection](https://en.wikipedia.org/wiki/Dependency_injection) into Kotlin scripts can be implemented. Once instantiated, you can call `PluginLoader.load` method with a given script file and a `Language` specifying the Kotlin version.
+
+For illustration of this you can check `io.github.antolius.example.Main` class in the _engine_ module:
+
+```java
+public class Main {
+    /*
+        Demonstrates the usage of Plugin loading and execution.
+        Run it with 3 arguments:
+        1. path to a Kotlin script with Plugin implementation
+        2. version of kotlin that the script is using
+        3. input that will be passed on to the script Plugin
+
+        The result of running the PLugin will be passed on
+        to the standard out.
+    */
+    public static void main(String[] args) {
+        ScriptEngineFactory factory = new ScriptEngineFactory();
+        Printer stdOutPrinter = System.out::println;
+        PluginLoader loader = new PluginLoader(factory, stdOutPrinter);
+
+        File scriptFile = new File(args[0]);
+        Language scriptLanguage = Language.valueOf(args[1]);
+        Plugin plugin = loader.load(scriptFile, scriptLanguage);
+
+        Request request = new Request(args[2]);
+        Response response = plugin.process(request);
+        System.out.println(response.getData());
+    }
+}
+```
+
+_Engine_ module also includes an example of a little bit more involved Kotlin script:
+
+```kotlin
+class Adder : Plugin, PrinterAware {
+    lateinit var p: Printer
+
+    override fun set(printer: Printer) {
+        p = printer
+    }
+
+    override fun process(req: Request): Response {
+        val expression = req.data
+        p.print("Evaluating expression `${expression}`")
+        try {
+            val sum = expression.split("+")
+                .map { it.trim() }
+                .map { it.toInt() }
+                .fold(0) { sum, a -> sum + a}
+            return Response("${sum}")
+        } catch(e: Exception) {
+            p.print("Error: ${e}")
+        } 
+        return Response("NaN")
+    }
+}
+```
+
+You can run this example by executing:
+
+```bash
+$ mvn exec:java -Dexec.mainClass="io.github.antolius.example.Main" -Dexec.args="src/main/resources/scripts/Adder.kt KOTLIN_1_3 '11 + 31'"
+```
+
+from within the `engine` directory.
+
 ## Testing
 
-_Engine_ module includes tests that load and execute actual Kotlin scripts. You can check out `io.github.antolius.engine.PluginLoaderTest` for example of various features, such as loading plugins from `.*kts` script or from `.kt` class file, or injecting dependencies into plugins. Kotlin scripts used for testing are included in the test resources directory of the _Engine_ module.
+_Engine_ module includes tests that load and execute actual Kotlin scripts. You can check out `io.github.antolius.engine.PluginLoaderTest` for example of various features, such as loading plugins from `.*kts` script or from `.kt` class file, or injecting dependencies into plugins. Kotlin scripts used for testing are included in the test resources directory of the _engine_ module.
 
 Note that if you open the test Kotlin scripts in IntelliJ IDEA you'll probably get warning about setting up maven module to use Kotlin. This is unfortunate consequence of this implementation: _engine_ module mustn't declare dependency on any one Kotlin version. It instead loads it in runtime along with Kotlin 1/2/3 modules. So IntelliJ will always raise warnings, as it cannot detect that.
 

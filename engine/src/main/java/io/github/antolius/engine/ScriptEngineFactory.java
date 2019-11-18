@@ -10,58 +10,53 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.function.Supplier;
 
-class ScriptEngineFactory {
+public class ScriptEngineFactory {
 
     private final ConcurrentMap<Language, ScriptEngine> enginesCache;
 
-    ScriptEngineFactory() {
+    public ScriptEngineFactory() {
         enginesCache = new ConcurrentHashMap<>();
     }
 
-    ScriptEngine get(Language version) {
+    public ScriptEngine get(Language version) {
         return enginesCache.computeIfAbsent(version, this::newEngine);
     }
 
     private ScriptEngine newEngine(Language version) {
-        File supplierJar = findSupplierJarFor(version.getJarFile());
+        URL supplierJar = version.getJarURL();
         ClassLoader classLoader = newClassLoaderWith(supplierJar);
-        Supplier<ScriptEngine> supplier = instantiateSupplierFrom(version.getSupplierClass(), classLoader);
+        Supplier<ScriptEngine> supplier =
+                instantiateSupplierFrom(version.getSupplierClass(), classLoader);
         return supplier.get();
     }
 
-    private File findSupplierJarFor(String filePath) {
-        File jarFile = new File(filePath);
-        if (!jarFile.exists() || !jarFile.canRead()) {
-            throw new RuntimeException("Couldn't find readable supplier jar file at " + filePath);
-        }
-        return jarFile;
-    }
-
-    private ClassLoader newClassLoaderWith(File jarToLoad) {
+    private ClassLoader newClassLoaderWith(URL jarToLoad) {
         try {
-            return URLClassLoader.newInstance(
-                    new URL[]{jarToLoad.toURI().toURL()},
-                    getClass().getClassLoader()
-            );
-        } catch (MalformedURLException e) {
+            System.out.println("Loading jar from: " + jarToLoad);
+            return URLClassLoader.newInstance(new URL[] {jarToLoad}, getClass().getClassLoader());
+        } catch (Exception e) {
             throw new RuntimeException("Couldn't convert supplier jar file to URL", e);
         }
     }
 
-    private Supplier<ScriptEngine> instantiateSupplierFrom(String supplierClassName, ClassLoader classLoader) {
+    private Supplier<ScriptEngine> instantiateSupplierFrom(String supplierClassName,
+            ClassLoader classLoader) {
         try {
             Class<?> exactSupplierClass = Class.forName(supplierClassName, true, classLoader);
             Class<? extends Supplier<ScriptEngine>> supplierClass = subclass(exactSupplierClass);
-            Constructor<? extends Supplier<ScriptEngine>> constructor = supplierClass.getConstructor();
+            Constructor<? extends Supplier<ScriptEngine>> constructor =
+                    supplierClass.getConstructor();
             return constructor.newInstance();
         } catch (Exception e) {
-            throw new RuntimeException("Couldn't load " + supplierClassName + " from class loader " + classLoader, e);
+            throw new RuntimeException(
+                    "Couldn't load " + supplierClassName + " from class loader " + classLoader, e);
         }
     }
 
     @SuppressWarnings("unchecked")
     private Class<? extends Supplier<ScriptEngine>> subclass(Class<?> exactSupplierClass) {
-        return (Class<? extends Supplier<ScriptEngine>>) exactSupplierClass.asSubclass(Supplier.class);
+        return (Class<? extends Supplier<ScriptEngine>>) exactSupplierClass
+                .asSubclass(Supplier.class);
     }
 
 }
